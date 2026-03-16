@@ -2,10 +2,12 @@ from django.views.generic.edit import UpdateView
 from .models import PersonalInfo, Job, Study, SocialMedia, SoftSkill, HardSkill, Language, CoverLetter, Company
 from django.views.generic import View, CreateView, UpdateView
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from .pdf_cv_view import PdfCreatorPort, PdfCreatorPort2
 from django.urls import reverse_lazy
-
+from cv_pdf_view.tasks import long_running_task
+from celery.result import AsyncResult
+from cv_creator.celery import app
 
 class PersonalInfoView(View):
     def get(self, request, *args, **kwargs):
@@ -157,8 +159,6 @@ class CompanyView(View):
 
         field_names = [
             field.name for field in Company._meta.get_fields()]
-        
-        popped_item = field_names.pop(0)
 
         table_headers = [i.capitalize().replace('_', ' ').title()
                          for i in field_names]
@@ -208,9 +208,27 @@ class CoverLetterView(View):
 
         table_headers = [i.capitalize().replace('_', ' ').title()
                          for i in field_names]
+        
+        task = long_running_task.delay(10)
 
         return render(
-            request, 'cover_letter_view.html', {'title': title, 'data': data, 'table_headers': table_headers, 'dict_part': dict_part})
+            request, 'cover_letter_view.html', {'title': title, 'data': data, 'table_headers': table_headers, 'dict_part': dict_part, 'task_id': task.id})
+
+
+def task_status(request, task_id):
+    result = AsyncResult(task_id, app=app)
+    response = {'status': result.status}
+
+    if result.status == 'PROGRESS':
+        response.update(result.info)
+    elif result.ready():
+        # safely stringify result or exception
+        try:
+            response['result'] = result.result
+        except Exception as e:
+            response['result'] = str(e)
+
+    return JsonResponse(response)
 
 
 class CoverLetterPdfView(View):

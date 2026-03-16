@@ -26,5 +26,7 @@ urlpatterns = [
          name='cover_letter_update'),
     path('cover_letter/create/',
          CoverLetterCreateView.as_view(), name='cover_letter_create'),
-    path('cover_letter', CoverLetterView.as_view(), name='cover_letter'),
+    path('cover_letter/', CoverLetterView.as_view(), name='cover_letter'),
+    path('task-status/<str:task_id>/',
+         task_status, name='task_status'),
 ]
