@@ -6,14 +6,72 @@ services:
       - .:/code
     ports:
       - 8000:8000
+    environment:
+      DEBUG: "1"
+      SECRET_KEY: testing
+      DATABASE_NAME: postgres
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DJANGO_ALLOWED_HOSTS: "localhost 127.0.0.1 [::1]"
+      CELERY_BROKER: "redis://redis:6379/0"
+      CELERY_BACKEND: "redis://redis:6379/0"
     depends_on:
       - db
+      - redis
+
   db:
-    image: postgres:13
+    image: postgres:13.2
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+
+  redis:
+    image: redis:6-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: .
+    command: celery -A cv_creator worker --loglevel=info
+    volumes:
+      - ./media_files:/media_files
     environment:
-      - "POSTGRES_HOST_AUTH_METHOD=trust"
+      DEBUG: "1"
+      DATABASE_NAME: postgres
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      CELERY_BROKER: "redis://redis:6379/0"
+      CELERY_BACKEND: "redis://redis:6379/0"
+      DJANGO_ALLOWED_HOSTS: "localhost 127.0.0.1 [::1]"
+    depends_on:
+      - db
+      - redis
+      - web
+
+  flower:
+    build: .
+    command: celery -A cv_creator flower --port=5555 --broker=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    environment:
+      DEBUG: "1"
+      SECRET_KEY: testing
+      CELERY_BROKER: "redis://redis:6379/0"
+      CELERY_BACKEND: "redis://redis:6379/0"
+    depends_on:
+      - db
+      - redis
+      - web
+      - celery
 
 volumes:
   postgres_data:

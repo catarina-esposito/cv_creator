@@ -5,8 +5,25 @@
 
 {% block main %}
 
-<div class="grid-row">
+<div id="progress-container" style="margin-top:20px; display:none; width: 100%; max-width: 600px;">
+    <div
+        style="width: 100%; background: #eee; border-radius: 25px; overflow: hidden; height: 25px; box-shadow: inset 0 0 5px rgba(0,0,0,0.2);">
+        <div id="progress-bar" style="
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #81c784);
+            text-align: center;
+            color: white;
+            line-height: 25px;
+            font-weight: bold;
+            transition: width 0.4s ease-in-out;
+        ">
+            0%
+        </div>
+    </div>
+</div>
 
+<div class="grid-row">
 
     <table class="table grid-item">
         <thead>
@@ -23,16 +40,58 @@
                 <td>{{ d.resume3 }}</td>
                 <td>{{ d.company }}</td>
                 <td> <a class="btn btn-update grid-item" href="{% url 'cover_letter_update' pk=d.id %}">Update</a> </td>
-                <td> <a class="btn btn-print grid-item" href="{% url 'cover_letter_as_pdf' pk=d.id %}"
-                        role="button" target="_blank">Print CV</a> </td>
+                <td> <a class="btn btn-print grid-item" href="{% url 'cover_letter_as_pdf' pk=d.id %}" role="button"
+                        target="_blank">Print CV</a> </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
+<a class="btn btn-bolder btn-update" href="{% url 'cover_letter_create' %}" role="button">Add</a>
 
-<a class="btn btn-bolder btn-update" href="{% url 'cover_letter_create' %}" role="button">New Letter</a>
+{% endblock %}
 
+{% block script %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const taskId = "{{ task_id }}"; 
+        if (!taskId) return;
 
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        progressContainer.style.display = 'block';
+
+        function updateProgress() {
+
+            fetch(`/cv_pdf_view/task-status/${taskId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "PROGRESS") {
+                        const percent = Math.floor((data.current / data.total) * 100);
+                        progressBar.style.width = percent + "%";
+                        progressBar.innerText = percent + "%";
+
+                    }
+                    if (data.status === "SUCCESS") {
+                        progressBar.style.width = "100%";
+                        progressBar.innerText = "Completed";
+                        return;
+                    }
+
+                    if (data.status === "FAILURE") {
+                        progressBar.style.width = "100%";
+                        progressBar.innerText = "Failed";
+                        progressBar.style.background = "red";
+                        return;
+                    }
+
+                    // for PENDING
+                    setTimeout(updateProgress, 500);
+                });
+        }
+
+        updateProgress();
+    });
+</script>
 {% endblock %}
